@@ -9,13 +9,13 @@
 | Phase 2 - CI/CD scaffold | Pending | GitHub Actions, container registry, SQLite state API |
 | Phase 3 - OpenClaw scaffold | Pending | Gateway, skills, deploy decision, rollback logic |
 | Phase 4 - Deployment scaffold | Pending | Docker Compose, Nginx, health check, rollback scripts |
-| Phase 5 - ChatOps scaffold | Pending | Slack app, slash commands, approval/status flow |
+| Phase 5 - ChatOps scaffold | Pending | Slack App (Socket Mode) + OpenClaw native Slack plugin; lệnh ChatOps tự nhiên (`@OpenClaw deploy latest`) |
 | Phase 6 - Assets and evidence | Pending | Diagram, screenshot, log mẫu, test evidence |
 | Phase 7 - Final report integration | Pending | Tổng hợp báo cáo, review, appendix, cost |
 
 ## Immediate Priorities
 
-1. ~~Chốt stack cho OpenClaw gateway và Slack bot.~~ ✓ Resolved: OpenClaw (install + skills), Slack (Python slack-bolt)
+1. ~~Chốt stack cho OpenClaw gateway và Slack ChatOps.~~ ✓ Resolved: OpenClaw (install + skills), Slack App (Socket Mode) qua plugin gốc OpenClaw (`channels.slack`)
 2. Chốt registry và state API shape.
 3. Chốt công cụ diagram và bộ asset proof.
 

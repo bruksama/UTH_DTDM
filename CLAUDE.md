@@ -1,42 +1,38 @@
-# Project Instructions
+# Project Instructions (for Claude)
 
-## Project Type
+This repository contains the academic report and documentation only. Demo/source code will live in a separate repository (TBD).
 
-Kho tai lieu va scaffold ban dau cho de tai hoc thuat ve AI DevOps assistant. Hien trang tap trung vao prompt, tai lieu va ke hoach; ma nguon demo se bo sung sau.
+## Final Architecture (Source of Truth)
+- CI/CD: GitHub Actions builds and pushes Docker images to a registry. No webhooks are sent.
+- Runtime: Single GCP C2 VM (Ubuntu 22.04) running Docker Compose and Nginx for blue-green switch.
+- OpenClaw: Runs on the VM and connects natively to Slack via Socket Mode using the built-in `channels.slack` plugin.
+- ChatOps: A human types `@OpenClaw deploy latest` in Slack. OpenClaw receives the message and orchestrates deployment via custom skills: `deploy_decision`, `container_control`, `health_checker`, `rollback_handler`, `log_analyzer`. SQLite stores state.
 
-## Source Of Truth
+## Hard Rules (do-not-violate)
+- Do not hallucinate webhook triggers. OpenClaw is triggered by human ChatOps via Slack.
+- Do not suggest writing custom Slack Bolt apps. OpenClaw uses its native Slack plugin (`channels.slack`) with App/Bot Tokens and Socket Mode.
+- Do not implement demo code in this repo. This repository is for the academic report and docs only.
+- Documentation language: All Markdown files under `docs/` and `README.md` must be in Vietnamese with proper tones. This `CLAUDE.md` is the only file in English.
+- File naming: Use kebab-case for new files (self-documenting names).
 
-- `docs/prompts/PROJECT_CONTEXT.md`
-- `docs/prompts/PROMPT_FOR_DUY_INFRASTRUCTURE.md`
-- `docs/prompts/PROMPT_FOR_KHANG_CICD.md`
-- `docs/prompts/PROMPT_FOR_LOC_OPENCLAW.md`
-- `docs/prompts/PROMPT_FOR_QUYEN_CHATOPS.md`
-- `docs/project-overview-pdr.md`
-- `docs/code-standards.md`
-- `docs/project-tracker.md`
+## Working Guidance
+- Source of truth docs: `docs/prompts/*`, `docs/project-overview-pdr.md`, `docs/code-standards.md`, `docs/project-tracker.md`.
+- Keep content accurate to the final architecture above; remove or correct stale references (e.g., Slack Bolt, webhooks).
+- Prefer concise, high-signal writing; prioritize correctness over completeness.
+- When adding examples, ensure they reflect the native OpenClaw Slack integration and the blue-green flow.
 
-## Working Rules
+## Scope & Boundaries
+- In scope (docs only): CI overview, OpenClaw integration, ChatOps flows, Docker Compose blue-green, Nginx switch, SQLite state, diagrams, and setup guides.
+- Out of scope (for this repo): Application code, custom Slack Bolt apps, Kubernetes, multi-VM orchestration, production hardening beyond minimal demos.
 
-- Uu tien cap nhat file hien co thay vi tao them bien the khong can thiet.
-- Giu ten file dang kebab-case, tu mo ta ro muc dich.
-- Neu them code sau nay, moi file nen duoi 200 dong neu co the tach logic hop ly.
-- Tai lieu va bao cao viet bang tieng Viet ky thuat; thuat ngu chuyen nganh giu nguyen tieng Anh khi can.
-- Khong mo rong pham vi vuot qua rang buoc prompt: single VM, Docker Compose blue-green, GitHub Actions, OpenClaw, Slack ChatOps.
+## Conventions
+- Vietnamese with tones for docs except this file.
+- Kebab-case file names.
+- Keep single files under ~800 LOC for docs; split when approaching size.
 
-## Repo Priorities
-
-1. Chot bo tai lieu nen va outline bao cao.
-2. Bo sung implementation scaffold cho CI, AI/CD, ChatOps va deployment.
-3. Them diagram, screenshot, log mau va huong dan demo.
-
-## Expected Deliverables
-
-- Tai lieu tong quan va kien truc
-- Roadmap va changelog
-- Chuan trinh bay, diagram, code block va trich dan
-- Scaffold cho phan cong nhom: Infrastructure, CI/CD, OpenClaw, ChatOps
-
-## Unresolved Questions
-
-- Chua co quy uoc ten de tai chinh thuc bang tieng Anh de dung cho code/package names.
-- Chua xac dinh stack uu tien cho OpenClaw gateway va Slack app: Node.js hay Python.
+## Quick Checklist for Any Edit
+- Architecture statements match the “Final Architecture” section.
+- No webhook/Bolt/auto-trigger claims beyond human-invoked Slack ChatOps.
+- Examples use `@OpenClaw ...` phrasing; no custom slash-command handlers.
+- Docs reference the native Slack plugin: `channels.slack`.
+- Repo scope reminder: docs/report only; code in a separate repo.

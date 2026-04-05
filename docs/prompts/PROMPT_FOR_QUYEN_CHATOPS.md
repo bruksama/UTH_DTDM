@@ -1,52 +1,49 @@
 # PROMPT CHO QUYẾN - CHATOPS & DOCUMENTATION LEAD
 
 ## VAI TRÒ CỦA BẠN
-Bạn là ChatOps Developer và Documentation Engineer. Bạn chịu trách nhiệm Slack Bot, tài liệu hướng dẫn, và tổng hợp báo cáo cuối cùng.
+Bạn là ChatOps Developer và Documentation Engineer. Bạn chịu trách nhiệm Slack App (Socket Mode), cấu hình tích hợp gốc của OpenClaw (`channels.slack`), tài liệu hướng dẫn, và tổng hợp báo cáo cuối cùng.
 
 ## PHẦN BẠN CẦN VIẾT
 1. **Chương 1** (Mở đầu): 1.1.1, 1.1.2, 1.2, 1.5 (trừ 1.3, 1.4)
-2. **Chương 2.5.1-2.5.2** (ChatOps và Slack Bolt)
+2. **Chương 2.5.1-2.5.2** (ChatOps và tích hợp Slack gốc của OpenClaw)
 3. **Chương 3.1** (Phân tích yêu cầu): 3.1.1 (FR), 3.1.2 (NFR)
 4. **Chương 3.2** (Use Case): Toàn bộ (3.2.1-3.2.3)
-5. **Chương 3.4.5** (ChatOps Interface)
+5. **Chương 3.4.5** (Giao diện ChatOps)
 6. **Chương 4.5** (Triển khai ChatOps): 4.5.1-4.5.3
 7. **Chương 4.6.1** (Chức năng - bảng tổng hợp)
 8. **Chương 5.3** (Đề xuất áp dụng)
 9. **Phụ lục A** (Phân công), **Phụ lục D** (Test logs)
 
 ## NGỮ CẢNH KỸ THUẬT
-### Slack Bolt Framework
-- Language: Python (slack-bolt) — lựa chọn chính thức
-- Socket Mode: Cho phép chạy behind firewall (VM không cần public IP static)
-- Slash Commands: 
-  - `/deploy [image-tag]` - Deploy thủ công
-  - `/status` - Xem trạng thái container
-  - `/rollback` - Quay lại version trước
-  - `/logs [lines]` - Xem log (mặc định 50 dòng)
-- Interactive Components: Buttons (Approve Deploy, View Logs), Select menus
+### Slack App (Socket Mode) + OpenClaw native Slack plugin
+- Không viết Slack Bolt app tùy biến (Python/Node.js) — không cần thiết.
+- Tạo Slack App tại `api.slack.com/apps`, bật Socket Mode, lấy App Token và Bot Token.
+- Cấu hình OpenClaw sử dụng plugin `channels.slack` (tích hợp gốc) với các token trên.
+- Kết nối workspace: OpenClaw lắng nghe tin nhắn ở kênh/chỉ định, hỗ trợ đề cập trực tiếp.
+- Cú pháp tương tác: Người dùng gõ trên Slack, ví dụ: `@OpenClaw deploy latest`.
+- Định dạng phản hồi: Markdown (tiêu đề, bảng, code block ngắn, trạng thái), màu sắc/biểu tượng do Slack theme hiển thị — ưu tiên rõ ràng.
 
-### Integration với OpenClaw
-- 2 cách kết nối:
-  1. Slack Bot gọi OpenClaw API (HTTP)
-  2. Shared SQLite (cùng đọc/ghi database với Khang)
-- Message format: Rich text (markdown), color coding (xanh lá success, đỏ error, vàng warning)
+### Tích hợp với OpenClaw
+- OpenClaw nhận tín hiệu ChatOps qua plugin `channels.slack` (không webhook tự động).
+- Chuỗi kỹ năng (skills): `deploy_decision`, `container_control`, `health_checker`, `rollback_handler`, `log_analyzer`.
+- Trạng thái được ghi vào SQLite; OpenClaw tổng hợp kết quả và trả lời về Slack.
 
 ## YÊU CẦU KHI VIẾT
 1. **Chương 1**: 
-   - Mở đầu hấp dẫn, liên kết thực tế (sinh viên gặp khó khăn với K8s)
+   - Mở đầu hấp dẫn, liên kết thực tế (đơn giản hóa so với Kubernetes)
    - Mục tiêu rõ ràng, đo lường được (giảm thời gian deploy, tăng tự động hóa)
 2. **Chương 3.1-3.2**: 
    - Liệt kê đầy đủ 6 chức năng chính (FR1-FR6)
    - Use Case Diagram (mô tả cho Duy vẽ): 4 use case chính (Auto-deploy, Manual Deploy, Auto-rollback, Query Status)
    - Đặc tả use case chi tiết: Actor, Precondition, Flow, Postcondition
 3. **Chương 3.4.5**: 
-   - Thiết kế giao diện chat (command syntax)
-   - Ví dụ dialog: User gõ gì → Bot trả lời gì
-   - Xử lý lỗi (error messages thân thiện)
+   - Thiết kế giao diện chat (cú pháp lệnh tự nhiên, ví dụ `@OpenClaw deploy latest`)
+   - Ví dụ hội thoại: Người dùng gõ gì → OpenClaw trả lời gì (dưới dạng Markdown)
+   - Xử lý lỗi (thông điệp thân thiện, có hướng dẫn tiếp theo)
 4. **Chương 4.5**: 
-   - Hướng dẫn tạo Slack App (api.slack.com/apps)
-   - Cấu hình Slash Commands, OAuth scopes (chat:write, commands, v.v.)
-   - Code mẫu Bolt app (xử lý command đơn giản)
+   - 4.5.1: Tạo Slack App (api.slack.com), bật Socket Mode, tạo App Token/Bot Token
+   - 4.5.2: Cấu hình OpenClaw Slack Plugin (`channels.slack`), ánh xạ workspace/kênh
+   - 4.5.3: Kiểm thử end-to-end: `@OpenClaw deploy latest` → theo dõi phản hồi và trạng thái
 
 ## NHIỆM VỤ TỔNG HỢP
 Bạn là **Editor-in-Chief** của báo cáo:
@@ -61,12 +58,11 @@ Bạn là **Editor-in-Chief** của báo cáo:
 
 ## ĐỊNH DẠNG ĐẦU RA
 - Chương 1, 3.1, 3.2: Viết mạch lạc, có dẫn chứng, liên kết logic
-- Chương 3.4.5: Có ví dụ cụ thể (screenshot hoặc text mô tả dialog)
-- Code blocks cho Python/Node.js (Bolt framework)
+- Chương 3.4.5: Có ví dụ hội thoại cụ thể (screenshot hoặc text mô tả)
 - Bảng so sánh chức năng (kế hoạch vs thực tế)
+- Không đưa code Bolt/Python/Node.js (không còn dùng)
 
 ## LƯU Ý QUAN TRỌNG
-- Chăm chỉ ghi chép từ đầu: Meeting notes, test cases, screenshot kết quả
-- Backup cho Khang về phần API nếu cần
-- Phối hợp với Lộc ở phần 4.5.3 để đảm bảo Slack kết nối đúng với OpenClaw
-- Test kỹ: Bot phải respond đúng, không timeout, message format đẹp
+- Ghi chép đầy đủ: Meeting notes, test cases, screenshot kết quả
+- Phối hợp với Lộc và Khang để đảm bảo kỹ năng OpenClaw và pipeline CI tương thích
+- Test kỹ: OpenClaw phải phản hồi đúng, không timeout, trình bày Markdown rõ ràng

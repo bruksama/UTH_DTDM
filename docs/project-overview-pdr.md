@@ -28,7 +28,7 @@
 - OpenClaw gateway, skills, deploy decision, rollback logic
 - Docker Compose blue-green, Nginx reverse proxy, health check
 - SQLite luu deployment history va current state
-- Slack Bolt cho ChatOps va approval/status flow
+- Slack App (Socket Mode) và tích hợp gốc OpenClaw (`channels.slack`) cho ChatOps và luồng approval/status
 - Bao cao hoc thuat, diagram, huong dan cai dat, cost comparison
 
 ### Out Of Scope
@@ -68,7 +68,7 @@
 | Docker Compose | Quản lý `app-blue` và `app-green` |
 | Nginx | Chuyển traffic giữa blue và green |
 | SQLite | Lưu deployment history và current state |
-| Slack Bot | Slash commands, approval, status, logs |
+| Slack App (Native OpenClaw Integration) | Socket Mode qua plugin gốc OpenClaw (`channels.slack`); approval, status, logs |
 
 ### Main Flow
 
@@ -93,7 +93,7 @@
 | OS | Ubuntu 22.04 LTS |
 | Runtime | Docker CE, Docker Compose v2, Nginx |
 | State store | SQLite |
-| ChatOps | Slack Bolt (Python slack-bolt) |
+| ChatOps | Slack App (Socket Mode) qua plugin gốc OpenClaw (`channels.slack`) |
 | Ports | 22, 80, 443, 8000 |
 | Disk | 50–100 GB pd-balanced (or pd-ssd), ext4 |
 
@@ -115,5 +115,5 @@
 
 ## Resolved Decisions
 
-- **Tech stack**: OpenClaw (cài đặt + viết skills), Slack bot (Python slack-bolt)
+- **Tech stack**: OpenClaw (cài đặt + viết skills), Slack App (Socket Mode) qua plugin gốc `channels.slack` (không dùng Slack Bolt)
 - **Repo scope**: Tài liệu/báo cáo only; mã demo ở repo riêng (TBD)
