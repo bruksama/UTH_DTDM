@@ -15,7 +15,7 @@ Bạn là chuyên gia OpenClaw và AI Architect. Bạn chịu trách nhiệm cá
 
 ## NGỮ CẢNH CHI TIẾT VỀ OPENCLAW
 - OpenClaw là AI Agent tự chủ (autonomous), không phải chatbot thông thường
-- Triển khai: Cài đặt OpenClaw hiện có (không tự phát triển gateway), cấu hình Gateway và tập trung vào Skills (Markdown) + Tools (Shell, Browser, File, Cron, Webhook)
+- Triển khai: Cài đặt OpenClaw hiện có (không tự phát triển gateway), cấu hình Gateway và tập trung vào Skills (Markdown) + Tools (Shell, Browser, File, Cron, Slack)
 - Chạy 24/7, có long-term memory, tự động hoàn thành tác vụ
 - Skills cần viết: receive_webhook, deploy_decision, container_control, health_checker, rollback_handler, log_analyzer
 - Tích hợp Claude API (Anthropic) để phân tích log và đưa ra quyết định

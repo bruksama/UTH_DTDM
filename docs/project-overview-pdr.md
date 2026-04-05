@@ -24,7 +24,7 @@
 
 ### In Scope
 
-- GitHub Actions build/push image va gui webhook
+- GitHub Actions build/push image lên registry
 - OpenClaw gateway, skills, deploy decision, rollback logic
 - Docker Compose blue-green, Nginx reverse proxy, health check
 - SQLite luu deployment history va current state
@@ -44,7 +44,7 @@
 
 - FR1: Trigger pipeline khi push code
 - FR2: Build và publish Docker image
-- FR3: Nhận webhook, xác thực, quyết định deploy
+- FR3: Nhận lệnh từ Slack, quyết định deploy
 - FR4: Health check và auto rollback nếu fail
 - FR5: Lưu/truy vấn deployment state và logs
 - FR6: Hỗ trợ Slack commands và thông báo kết quả
@@ -53,7 +53,7 @@
 
 - Đơn giản, dễ demo, hợp ngữ cảnh sinh viên
 - Audit được state và kết quả health check
-- Bảo mật cơ bản: HMAC, secrets, SSH key only, firewall, non-root Docker
+- Bảo mật cơ bản: secrets, SSH key only, firewall, non-root Docker
 - Tài liệu rõ, có diagram, code block và mapping phân công
 
 ## Architecture Snapshot
@@ -62,9 +62,9 @@
 
 | Thành phần | Vai trò |
 | --- | --- |
-| GitHub Actions | Build image, push registry, gửi webhook |
-| OpenClaw Gateway | Nhận webhook, gọi skills, điều phối deployment |
-| Skills | `receive_webhook`, `deploy_decision`, `container_control`, `health_checker`, `rollback_handler`, `log_analyzer` |
+| GitHub Actions | Build image, push registry |
+| OpenClaw Gateway | Nhận yêu cầu qua Slack, gọi skills, điều phối deployment |
+| Skills | `deploy_decision`, `container_control`, `health_checker`, `rollback_handler`, `log_analyzer` |
 | Docker Compose | Quản lý `app-blue` và `app-green` |
 | Nginx | Chuyển traffic giữa blue và green |
 | SQLite | Lưu deployment history và current state |
@@ -74,7 +74,7 @@
 
 1. Developer push code lên GitHub.
 2. GitHub Actions build image và push registry.
-3. Workflow gửi webhook POST tới OpenClaw.
+3. Người dùng gõ `@OpenClaw deploy the latest image` (hoặc slash command) trên Slack.
 4. OpenClaw xác thực payload, quyết định deploy ngay hoặc đợi approval.
 5. Runtime pull image, start container mới, chạy health check.
 6. Nếu healthy, Nginx switch upstream sang version mới.
@@ -89,12 +89,13 @@
 
 | Thành phần | Cấu hình mục tiêu |
 | --- | --- |
-| VM | AWS EC2 t3.medium hoặc Azure Standard_B2s |
+| VM | GCP C2 (existing VM) |
 | OS | Ubuntu 22.04 LTS |
 | Runtime | Docker CE, Docker Compose v2, Nginx |
 | State store | SQLite |
-| ChatOps | Slack Bolt |
+| ChatOps | Slack Bolt (Python slack-bolt) |
 | Ports | 22, 80, 443, 8000 |
+| Disk | 50–100 GB pd-balanced (or pd-ssd), ext4 |
 
 ## Ownership
 
@@ -102,14 +103,14 @@
 | --- | --- |
 | Lộc | OpenClaw, AI logic, state machine, rollback |
 | Duy | VM, Docker, network, security, diagram |
-| Khang | GitHub Actions, webhook, SQLite state, cost |
+| Khang | GitHub Actions, container registry, SQLite state, cost |
 | Quyến | Slack ChatOps, documentation, tổng hợp báo cáo |
 
 ## Deliverables
 
 - Báo cáo đồ án với chapter ownership rõ ràng
 - 5 diagram bắt buộc: architecture, use case, sequence, state machine, blue-green
-- Mẫu workflow GitHub Actions, payload webhook, SQLite schema, Slack flow
+- Mẫu workflow GitHub Actions, SQLite schema, Slack flow
 - Scaffold để bổ sung code demo ở vòng tiếp theo
 
 ## Resolved Decisions

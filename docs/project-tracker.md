@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | Phase 0 - Bootstrap docs | Complete | Đã khởi tạo README, CLAUDE và docs nền |
 | Phase 1 - Finalize report outline | In Progress | Chốt chapter structure, ownership, references |
-| Phase 2 - CI/CD scaffold | Pending | GitHub Actions, webhook contract, SQLite state API |
+| Phase 2 - CI/CD scaffold | Pending | GitHub Actions, container registry, SQLite state API |
 | Phase 3 - OpenClaw scaffold | Pending | Gateway, skills, deploy decision, rollback logic |
 | Phase 4 - Deployment scaffold | Pending | Docker Compose, Nginx, health check, rollback scripts |
 | Phase 5 - ChatOps scaffold | Pending | Slack app, slash commands, approval/status flow |
@@ -16,7 +16,7 @@
 ## Immediate Priorities
 
 1. ~~Chốt stack cho OpenClaw gateway và Slack bot.~~ ✓ Resolved: OpenClaw (install + skills), Slack (Python slack-bolt)
-2. Chốt registry, webhook contract và state API shape.
+2. Chốt registry và state API shape.
 3. Chốt công cụ diagram và bộ asset proof.
 
 ## Dependencies

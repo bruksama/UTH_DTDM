@@ -8,7 +8,7 @@
 ## 2. STACK CÔNG NGHỆ
 ### CI Layer (Cloud)
 - GitHub Actions: Build Docker image, push to Docker Hub
-- Webhook: Trigger từ GitHub đến OpenClaw
+- Không có webhook trực tiếp: Trigger qua ChatOps (Slack)
 
 ### AI/CD Layer (VM - AWS EC2/Azure VM)
 - **OpenClaw**: AI Agent tự chủ (Node.js/Python)

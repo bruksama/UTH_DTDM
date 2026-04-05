@@ -23,14 +23,14 @@ Tài liệu này gộp code standards, documentation standards và design guidel
 ## Language Rules
 
 - Nội dung chính viết bằng tiếng Việt
-- Giữ nguyên thuật ngữ như Webhook, Container, Health Check, Rollback, Slash Command
+- Giữ nguyên thuật ngữ như Container, Health Check, Rollback, Slash Command
 - Trích dẫn theo IEEE khi đi vào báo cáo chính thức
 
 ## Code Block Rules
 
 - YAML cho GitHub Actions, Docker Compose
 - Bash cho script deployment, health check, firewall
-- Slack Bot: Python (slack-bolt). Webhook/state API: Python hoặc Node.js
+- Slack Bot: Python (slack-bolt). State API: Python hoặc Node.js
 - Nếu chỉ là minh họa, phải viết rõ phạm vi và assumptions
 
 ## Architecture Rules
@@ -42,7 +42,7 @@ Tài liệu này gộp code standards, documentation standards và design guidel
 ## Security Rules
 
 - Không đưa secret thật vào repo
-- Mô tả HMAC verification, secrets management, SSH key-only access
+- Mô tả secrets management, SSH key-only access
 - Ưu tiên non-root Docker và firewall rules rõ ràng
 
 ## Diagram Rules

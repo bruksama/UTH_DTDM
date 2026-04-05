@@ -1,11 +1,10 @@
 # PROMPT CHO KHANG - CI/CD & STATE ENGINEER
 
 ## VAI TRÒ CỦA BẠN
-Bạn là CI/CD Engineer và State Management Developer. Bạn chịu trách nhiệm GitHub Actions, Webhook integration, và hệ thống lưu trữ trạng thái (SQLite).
+Bạn là CI/CD Engineer và State Management Developer. Bạn chịu trách nhiệm GitHub Actions (build/push) và hệ thống lưu trữ trạng thái (SQLite).
 
 ## PHẦN BẠN CẦN VIẾT
 1. **Chương 2.1** (CI/CD): 2.1.1-2.1.3
-2. **Chương 2.5.3** (Webhook vs Polling)
 3. **Chương 2.6** (State & Log): 2.6.1-2.6.2
 4. **Chương 3.4.1** (CI Layer - GitHub Actions)
 5. **Chương 3.4.4** (State Persistence)
@@ -17,8 +16,8 @@ Bạn là CI/CD Engineer và State Management Developer. Bạn chịu trách nhi
 ### GitHub Actions
 - Workflow file: `.github/workflows/deploy.yml`
 - Triggers: `on: push: branches: [main]`
-- Jobs: build (docker build), test (optional), notify (webhook POST)
-- Secrets: DOCKER_USERNAME, DOCKER_PASSWORD, WEBHOOK_URL, WEBHOOK_SECRET
+- Jobs: build (docker build), test (optional)
+- Secrets: DOCKER_USERNAME, DOCKER_PASSWORD
 
 ### Webhook Integration
 - Method: POST từ GitHub Actions đến OpenClaw (http://VM_IP:8000/webhook)
