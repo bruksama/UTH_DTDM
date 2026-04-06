@@ -23,21 +23,21 @@ Tài liệu này gộp code standards, documentation standards và design guidel
 ## Language Rules
 
 - Nội dung chính viết bằng tiếng Việt
-- Giữ nguyên thuật ngữ như Container, Health Check, Rollback, Slash Command
+- Giữ nguyên thuật ngữ như Container, Health Check, Rollback, ChatOps
 - Trích dẫn theo IEEE khi đi vào báo cáo chính thức
 
 ## Code Block Rules
 
 - YAML cho GitHub Actions, Docker Compose
 - Bash cho script deployment, health check, firewall
-- Slack Bot: Python (slack-bolt). State API: Python hoặc Node.js
+- OpenClaw Slack integration: native plugin `channels.slack` qua Socket Mode. State layer có thể mô tả bằng Python hoặc Node.js nếu cần minh họa
 - Nếu chỉ là minh họa, phải viết rõ phạm vi và assumptions
 
 ## Architecture Rules
 
 - Không mở rộng ra Kubernetes hoặc multi-node nếu prompt không yêu cầu
-- Kiến trúc mặc định: GitHub Actions -> OpenClaw -> Docker/Nginx -> Slack
-- State machine mặc định gồm 5 trạng thái: IDLE, DEPLOYING, HEALTH_CHECKING, ACTIVE, ROLLING_BACK
+- Kiến trúc mặc định: GitHub Actions push image lên registry; người vận hành ra lệnh qua Slack; OpenClaw điều phối Docker/Nginx
+- State machine mặc định gồm 6 trạng thái: IDLE, WAITING_CONFIRMATION, DEPLOYING, HEALTH_CHECKING, ACTIVE, ROLLING_BACK
 
 ## Security Rules
 

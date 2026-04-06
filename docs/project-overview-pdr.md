@@ -9,10 +9,10 @@
 - Vận hành thủ công dễ lỗi, khó rollback, khó theo dõi state.
 - Kubernetes quá nặng đối với phạm vi demo học thuật.
 - Mục tiêu chính:
-  - Tự động hóa luồng push code -> build image -> deploy -> notify
-  - Cho phép OpenClaw tự quyết định auto-deploy hoặc đợi approval
+  - Tự động hóa luồng push code -> build/push image; bước deploy được khởi phát qua Slack ChatOps
+  - Cho phép OpenClaw quyết định triển khai ngay hoặc hỏi xác nhận sau khi nhận lệnh từ Slack
   - Hỗ trợ health check, rollback, log analysis
-  - Cung cấp `/deploy`, `/status`, `/rollback`, `/logs` qua Slack
+  - Cung cấp lệnh ChatOps như deploy, status, rollback, logs qua Slack
 
 ## Repo State
 
@@ -25,7 +25,7 @@
 ### In Scope
 
 - GitHub Actions build/push image lên registry
-- OpenClaw gateway, skills, deploy decision, rollback logic
+- OpenClaw, skills, deploy decision, rollback logic
 - Docker Compose blue-green, Nginx reverse proxy, health check
 - SQLite luu deployment history va current state
 - Slack App (Socket Mode) và tích hợp gốc OpenClaw (`channels.slack`) cho ChatOps và luồng approval/status
@@ -63,7 +63,7 @@
 | Thành phần | Vai trò |
 | --- | --- |
 | GitHub Actions | Build image, push registry |
-| OpenClaw Gateway | Nhận yêu cầu qua Slack, gọi skills, điều phối deployment |
+| OpenClaw | Nhận yêu cầu qua Slack qua `channels.slack`, gọi skills, điều phối deployment |
 | Skills | `deploy_decision`, `container_control`, `health_checker`, `rollback_handler`, `log_analyzer` |
 | Docker Compose | Quản lý `app-blue` và `app-green` |
 | Nginx | Chuyển traffic giữa blue và green |
@@ -74,8 +74,8 @@
 
 1. Developer push code lên GitHub.
 2. GitHub Actions build image và push registry.
-3. Người dùng gõ `@OpenClaw deploy the latest image` (hoặc slash command) trên Slack.
-4. OpenClaw xác thực payload, quyết định deploy ngay hoặc đợi approval.
+3. Người dùng gõ `@OpenClaw deploy latest` trên Slack.
+4. OpenClaw đọc yêu cầu ChatOps, quyết định deploy ngay hoặc hỏi xác nhận.
 5. Runtime pull image, start container mới, chạy health check.
 6. Nếu healthy, Nginx switch upstream sang version mới.
 7. Nếu fail, OpenClaw rollback về version trước và phân tích log.
@@ -83,7 +83,7 @@
 
 ### State Machine
 
-`IDLE -> DEPLOYING -> HEALTH_CHECKING -> ACTIVE | ROLLING_BACK`
+`IDLE -> WAITING_CONFIRMATION -> DEPLOYING -> HEALTH_CHECKING -> ACTIVE | ROLLING_BACK`
 
 ## Deployment Target
 
@@ -94,7 +94,7 @@
 | Runtime | Docker CE, Docker Compose v2, Nginx |
 | State store | SQLite |
 | ChatOps | Slack App (Socket Mode) qua plugin gốc OpenClaw (`channels.slack`) |
-| Ports | 22, 80, 443, 8000 |
+| Ports | 22, 80, 443 |
 | Disk | 50–100 GB pd-balanced (or pd-ssd), ext4 |
 
 ## Ownership
