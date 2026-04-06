@@ -15,9 +15,9 @@ Bạn là Infrastructure Engineer và Visual Designer. Bạn chịu trách nhi�
 
 ## NGỮ CẢNH KỸ THUẬT
 ### Infrastructure Stack
-- **VM**: AWS EC2 t3.medium (2 vCPU, 4GB RAM) hoặc Azure Standard_B2s, Ubuntu 22.04 LTS
+- **VM**: GCP Compute Engine C2, Ubuntu 22.04 LTS
 - **Docker**: Docker CE, Docker Compose v2
-- **Network**: Security Groups mở port 22 (SSH), 80 (HTTP), 443 (HTTPS), 8000 (OpenClaw internal)
+- **Network**: GCP VPC firewall rules mở port 22 (SSH), 80 (HTTP), 443 (HTTPS); cổng nội bộ chỉ bind localhost
 - **Storage**: 20GB SSD, volumes cho logs và SQLite
 
 ### Blue-Green Deployment Pattern
@@ -44,10 +44,10 @@ Bạn là Infrastructure Engineer và Visual Designer. Bạn chịu trách nhi�
 
 ## NHIỆM VỤ DESIGN
 Bạn phải tạo **5 diagram** (vẽ bằng draw.io/Excalidraw, chèn vào báo cáo):
-1. **Hình 3.1**: Sơ đồ kiến trúc 3 lớp (GitHub → OpenClaw → Docker → Slack)
-2. **Hình 3.2**: Use Case Diagram (Developer, OpenClaw, GitHub System)
+1. **Hình 3.1**: Sơ đồ kiến trúc 3 lớp (GitHub Actions/Registry → Slack/OpenClaw → Docker/Nginx trên GCP C2)
+2. **Hình 3.2**: Use Case Diagram (Developer, Người vận hành trên Slack, OpenClaw, GitHub System)
 3. **Hình 3.3**: Luồng dữ liệu (Sequence từ push code đến notify)
-4. **Hình 3.4**: State Machine (5 trạng thái của OpenClaw)
+4. **Hình 3.4**: State Machine (6 trạng thái của OpenClaw)
 5. **Hình 3.5**: Blue-Green Deployment Architecture
 
 Yêu cầu hình ảnh:
