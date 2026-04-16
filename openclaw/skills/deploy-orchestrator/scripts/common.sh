@@ -3,36 +3,41 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Thiết lập đường dẫn dựa trên vị trí skill (tự chứa)
+RUNTIME_DIR="$SKILL_DIR/runtime"
+DB_PATH="$RUNTIME_DIR/deploy.db"
+CONFIG_FILE="$SKILL_DIR/config/deploy-config.yaml"
+
 DEFAULT_CONFIG_PATH="$SKILL_DIR/config/deploy-config.example.yaml"
 DEFAULT_ENV_EXAMPLE="$SKILL_DIR/config/deploy.env.example"
 
 load_env_if_present() {
   local env_file="${DEPLOY_ENV_FILE:-$SKILL_DIR/config/deploy.env}"
   if [ -f "$env_file" ]; then
-    # shellcheck disable=SC1090
     set -a && . "$env_file" && set +a
   fi
 }
 
+# Đọc config từ file YAML trong SKILL_DIR
 cfg_get() {
   local key="$1"
-  local config_path="${DEPLOY_CONFIG_PATH:-$DEFAULT_CONFIG_PATH}"
-  python3 - "$config_path" "$key" <<'PY'
+  python3 - "$CONFIG_FILE" "$key" <<'PY'
 import sys, yaml
 path, key = sys.argv[1], sys.argv[2]
-with open(path, 'r', encoding='utf-8') as f:
-    data = yaml.safe_load(f) or {}
-cur = data
-for part in key.split('.'):
-    if isinstance(cur, dict) and part in cur:
-        cur = cur[part]
-    else:
-        print("")
-        sys.exit(0)
-if cur is None:
+try:
+    with open(path, 'r', encoding='utf-8') as f:
+        data = yaml.safe_load(f) or {}
+    cur = data
+    for part in key.split('.'):
+        if isinstance(cur, dict) and part in cur:
+            cur = cur[part]
+        else:
+            print("")
+            sys.exit(0)
+    print(cur if cur is not None else "")
+except FileNotFoundError:
     print("")
-else:
-    print(cur)
 PY
 }
 
@@ -48,7 +53,7 @@ require_bin() {
 }
 
 sqlite_query() {
-  local db="$1"
+  local db="$DB_PATH"
   shift
   python3 - "$db" "$@" <<'PY'
 import sqlite3, sys
@@ -63,15 +68,4 @@ for row in rows:
 conn.commit()
 conn.close()
 PY
-}
-
-candidate_from_active() {
-  local active="$1"
-  if [ "$active" = "blue" ]; then
-    echo green
-  elif [ "$active" = "green" ]; then
-    echo blue
-  else
-    echo blue
-  fi
 }

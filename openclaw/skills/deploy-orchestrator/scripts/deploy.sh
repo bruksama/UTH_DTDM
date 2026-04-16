@@ -16,7 +16,7 @@ require_bin python3
 require_bin curl
 
 CONFIG_PATH="${DEPLOY_CONFIG_PATH:-$SKILL_DIR/config/deploy-config.yaml}"
-SQLITE_PATH="${DEPLOY_SQLITE_PATH:-$(cfg_get paths.sqlite_db)}"
+SQLITE_PATH="$DB_PATH"
 COMPOSE_FILE="${DEPLOY_COMPOSE_FILE:-$(cfg_get paths.compose_file)}"
 ENVIRONMENT="${DEPLOY_ENVIRONMENT:-$(cfg_get environment)}"
 BLUE_SERVICE="${DEPLOY_BLUE_SERVICE:-$(cfg_get services.blue)}"
