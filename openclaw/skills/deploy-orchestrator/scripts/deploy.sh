@@ -11,35 +11,21 @@ REQUESTED_COMMAND="deploy ${REQUESTED_IMAGE}"
 "$SCRIPT_DIR/ensure_init.sh" >/dev/null
 load_env_if_present
 
-require_bin docker
 require_bin python3
-require_bin curl
 
 CONFIG_PATH="${DEPLOY_CONFIG_PATH:-$SKILL_DIR/config/deploy-config.yaml}"
 SQLITE_PATH="$DB_PATH"
-COMPOSE_FILE="${DEPLOY_COMPOSE_FILE:-$(cfg_get paths.compose_file)}"
 ENVIRONMENT="${DEPLOY_ENVIRONMENT:-$(cfg_get environment)}"
-BLUE_SERVICE="${DEPLOY_BLUE_SERVICE:-$(cfg_get services.blue)}"
-GREEN_SERVICE="${DEPLOY_GREEN_SERVICE:-$(cfg_get services.green)}"
-PUBLIC_BASE_URL="${DEPLOY_PUBLIC_BASE_URL:-$(cfg_get health.public_base_url)}"
-HEALTH_ROUTE="${DEPLOY_HEALTH_ROUTE:-$(cfg_get health.route)}"
-EDGE_SERVICE="${DEPLOY_EDGE_SERVICE:-$(cfg_get services.edge)}"
+# TRỎ ĐƯỜNG DẪN VỀ REPO CHỨA APP
+REPO_DIR="${DEPLOY_REPO_DIR:-/home/ice147ender/apps/UTH_DTDM_demo}"
 
 export DEPLOY_CONFIG_PATH="$CONFIG_PATH"
-export DEPLOY_SQLITE_PATH="$SQLITE_PATH"
-export DEPLOY_COMPOSE_FILE="$COMPOSE_FILE"
-export DEPLOY_ENVIRONMENT="$ENVIRONMENT"
-export DEPLOY_BLUE_SERVICE="$BLUE_SERVICE"
-export DEPLOY_GREEN_SERVICE="$GREEN_SERVICE"
-export DEPLOY_PUBLIC_BASE_URL="$PUBLIC_BASE_URL"
-export DEPLOY_HEALTH_ROUTE="$HEALTH_ROUTE"
-export DEPLOY_EDGE_SERVICE="$EDGE_SERVICE"
 
 DEPLOYMENT_ID="dep-$(date -u +%Y%m%d%H%M%S)-$$"
 STARTED_AT="$(now_utc)"
 PREVIOUS_COLOR=""
+PREVIOUS_TAG=""
 CANDIDATE_COLOR=""
-CANDIDATE_SERVICE=""
 RESOLVED_TAG=""
 RESOLVED_DIGEST=""
 FAIL_STEP="unknown"
@@ -82,7 +68,7 @@ handle_failure() {
   local exit_code=$?
   [ "$SUCCESS" = "1" ] && return 0
 
-  local finished_at rollback_status summary rollback_color="${PREVIOUS_COLOR:-}"
+  local finished_at rollback_status summary rollback_color="${PREVIOUS_COLOR:-}" rollback_tag="${PREVIOUS_TAG:-latest}"
   finished_at="$(now_utc)"
 
   python3 - "$SQLITE_PATH" "$DEPLOYMENT_ID" "$FAIL_STEP" "$finished_at" <<'PY'
@@ -94,8 +80,10 @@ cur.execute('UPDATE deployment_history SET status=?, error_summary=?, finished_a
 conn.commit(); conn.close()
 PY
 
-  if [ -n "$rollback_color" ]; then
-    if "$SCRIPT_DIR/rollback.sh" "$rollback_color" >/dev/null 2>&1; then
+  if [ -n "$rollback_color" ] && [ -d "$REPO_DIR" ]; then
+    echo "Initiating rollback to $rollback_color with tag $rollback_tag..." >&2
+    # GỌI LẠI SCRIPT CỦA APP ĐỂ ROLLBACK
+    if (cd "$REPO_DIR" && bash ./scripts/switch.sh "$rollback_color" "$rollback_tag" >/dev/null 2>&1); then
       rollback_status="rolled_back"
       summary="Deploy thất bại ở bước ${FAIL_STEP}, đã rollback về ${rollback_color}."
       python3 - "$SQLITE_PATH" "$ENVIRONMENT" "$rollback_color" "$DEPLOYMENT_ID" "$finished_at" "$summary" <<'PY'
@@ -123,7 +111,7 @@ conn.commit(); conn.close()
 PY
     fi
   else
-    summary="Deploy thất bại ở bước ${FAIL_STEP}, không có previous color để rollback."
+    summary="Deploy thất bại ở bước ${FAIL_STEP}, không thể rollback."
     python3 - "$SQLITE_PATH" "$ENVIRONMENT" "$DEPLOYMENT_ID" "$finished_at" "$summary" <<'PY'
 import sqlite3, sys
 conn = sqlite3.connect(sys.argv[1])
@@ -142,19 +130,21 @@ PY
 trap cleanup_lock EXIT
 trap handle_failure ERR
 
+FAIL_STEP="resolve-image"
 RESOLVED_JSON="$(DEPLOY_CONFIG_PATH="$CONFIG_PATH" python3 "$SCRIPT_DIR/resolve_image.py" "$REQUESTED_IMAGE")"
 RESOLVED_TAG="$(python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["resolved_tag"])' <<<"$RESOLVED_JSON")"
 RESOLVED_DIGEST="$(python3 -c 'import json,sys; print(json.loads(sys.stdin.read()).get("resolved_digest") or "")' <<<"$RESOLVED_JSON")"
 
+FAIL_STEP="read-state"
 STATE_JSON="$("$SCRIPT_DIR/status.sh")"
 ACTIVE_COLOR="$(python3 -c 'import json,sys; data=json.loads(sys.stdin.read()); print(data.get("active_color") or "")' <<<"$STATE_JSON")"
-CANDIDATE_COLOR="$(candidate_from_active "$ACTIVE_COLOR")"
-CANDIDATE_SERVICE="$GREEN_SERVICE"
-PREVIOUS_COLOR="$ACTIVE_COLOR"
-if [ "$CANDIDATE_COLOR" = "blue" ]; then
-  CANDIDATE_SERVICE="$BLUE_SERVICE"
-fi
+PREVIOUS_TAG="$(python3 -c 'import json,sys; data=json.loads(sys.stdin.read()); print(data.get("active_image_tag") or "latest")' <<<"$STATE_JSON")"
 
+PREVIOUS_COLOR="$ACTIVE_COLOR"
+[ -z "$PREVIOUS_COLOR" ] && PREVIOUS_COLOR="blue"
+CANDIDATE_COLOR="$(candidate_from_active "$ACTIVE_COLOR")"
+
+FAIL_STEP="write-pending-state"
 python3 - "$SQLITE_PATH" "$DEPLOYMENT_ID" "$ENVIRONMENT" "$REQUESTED_BY" "$REQUESTED_COMMAND" "$REQUESTED_IMAGE" "$RESOLVED_TAG" "$RESOLVED_DIGEST" "$PREVIOUS_COLOR" "$CANDIDATE_COLOR" "$STARTED_AT" <<'PY'
 import sqlite3, sys
 conn = sqlite3.connect(sys.argv[1])
@@ -166,29 +156,21 @@ cur.execute('INSERT INTO deployment_state(environment, active_color, active_imag
 conn.commit(); conn.close()
 PY
 
-IMAGE_REF="$REQUESTED_IMAGE"
-if [ "$REQUESTED_IMAGE" = "latest" ]; then
-  IMAGE_REF="$RESOLVED_TAG"
+FAIL_STEP="delegate-to-app-repo"
+if [ ! -d "$REPO_DIR" ]; then
+  echo "Error: App repository not found at $REPO_DIR" >&2
+  exit 1
 fi
 
-FAIL_STEP="pull-image"
-docker pull "$IMAGE_REF" >/dev/null 2>&1
+# =====================================================================
+# DELEGATION POINT: Gọi script thực thi hạ tầng của chính ứng dụng
+# =====================================================================
+cd "$REPO_DIR"
+bash ./scripts/switch.sh "$CANDIDATE_COLOR" "$RESOLVED_TAG" >/dev/null
 
-FAIL_STEP="start-candidate"
-docker compose -f "$COMPOSE_FILE" up -d "$CANDIDATE_SERVICE"
-
-FAIL_STEP="pre-switch-health-check"
-USE_COMPOSE_EXEC=1 DEPLOY_EDGE_SERVICE="$EDGE_SERVICE" DEPLOY_COMPOSE_FILE="$COMPOSE_FILE" \
-  "$SCRIPT_DIR/health_check.sh" "http://${CANDIDATE_SERVICE}:80${HEALTH_ROUTE}" >/dev/null
-
-FAIL_STEP="switch-traffic"
-"$SCRIPT_DIR/switch_traffic.sh" "$CANDIDATE_COLOR" >/dev/null
-
-FAIL_STEP="post-switch-health-check"
-"$SCRIPT_DIR/health_check.sh" "${PUBLIC_BASE_URL}${HEALTH_ROUTE}" >/dev/null
-
+FAIL_STEP="finalize-state"
 FINISHED_AT="$(now_utc)"
-CONTAINER_NAME="$CANDIDATE_SERVICE"
+CONTAINER_NAME="app-${CANDIDATE_COLOR}"
 SUMMARY="Deploy thành công: ${RESOLVED_TAG} lên ${CANDIDATE_COLOR}, health check pass, traffic đã chuyển."
 
 python3 - "$SQLITE_PATH" "$ENVIRONMENT" "$CANDIDATE_COLOR" "$RESOLVED_TAG" "$RESOLVED_DIGEST" "$CONTAINER_NAME" "$PREVIOUS_COLOR" "$DEPLOYMENT_ID" "$FINISHED_AT" "$SUMMARY" <<'PY'
