@@ -1,173 +1,132 @@
 ---
 name: log-analyzer
-description: Analyze deployment or rollback failures on the single-VM Docker host, inspect logs from containers and related services, summarize likely root causes, and prepare concise operator-facing guidance for Slack.
+description: Analyze deployment or rollback failures for Dockerized web apps on a single VM: collect relevant logs, extract likely failure categories, summarize evidence, and generate concise operator-facing diagnostics for Slack.
 metadata:
   openclaw:
     os: ["linux"]
     requires:
-      bins: ["docker"]
+      bins: ["bash", "docker", "python3"]
       config: []
 ---
 
 # Log Analyzer
 
-## Purpose
-
 `log-analyzer` là skill phụ cho v1.
-Nó không tham gia điều khiển deploy flow chính, mà chỉ được dùng để đọc evidence kỹ thuật và tóm tắt lỗi theo cách operator có thể hiểu nhanh.
 
-Skill này tồn tại để giữ phần “AI hỗ trợ” ở nơi hợp lý nhất:
-- sau deploy fail
-- sau rollback fail
-- khi cần chẩn đoán nguyên nhân để báo về Slack
-
-## Scope
-
-Skill này làm các việc sau:
-- đọc các log source liên quan
+Nó không điều khiển deploy flow chính.
+Vai trò của nó là:
+- đọc log liên quan đến deploy/rollback
 - gom evidence ngắn gọn
-- phân biệt deploy failure và rollback failure
-- đưa ra root-cause hypothesis ngắn gọn, có mức tự tin vừa phải
-- đề xuất operator action tiếp theo
-- tạo summary phù hợp để gửi lên Slack
+- suy luận nguyên nhân khả dĩ nhất ở mức thận trọng
+- tạo summary ngắn cho operator
 
-## Must Not Do
+## Khi nào dùng skill này
 
-- Không được tự start/stop container
-- Không được tự switch traffic
-- Không được tự sửa state/history
-- Không được khẳng định nguyên nhân gốc nếu evidence còn yếu
-- Không được thay thế hoàn toàn raw logs; summary chỉ là lớp hỗ trợ cho operator
-
-## Typical Trigger Conditions
-
-Gọi skill này khi:
-- candidate container fail startup
+Dùng skill này khi:
+- deploy fail
 - health check fail
 - traffic switch fail
 - rollback fail
-- operator yêu cầu giải thích ngắn gọn vì sao deploy thất bại
+- operator muốn giải thích ngắn gọn vì sao deploy thất bại
 
-Policy cho v1:
-- không cần gọi skill này cho mọi deploy thành công bình thường
-- nên auto-run khi deploy fail hoặc rollback fail
+Không cần gọi skill này cho mọi deploy thành công bình thường.
 
-## Inputs
+## Skill package layout
 
-### Required inputs
-- deployment context hoặc rollback context
-- target image / container / color liên quan
-- log sources khả dụng
+```text
+log-analyzer/
+├── SKILL.md
+└── scripts/
+    ├── analyze_logs.py
+    ├── collect_logs.sh
+    └── summarize.sh
+```
 
-### Optional inputs
-- timeframe cần phân tích
-- line limit
-- health-check evidence
-- Nginx switch result
-- previous deployment record
+## Cách vận hành
 
-## Log Sources
+### 1. Collect logs
 
-Tối thiểu nên hỗ trợ các nguồn sau nếu có:
-- Docker container logs của candidate
-- Docker container logs của active/previous container
-- Docker Compose logs
-- deploy script logs
-- Nginx logs nếu traffic switch liên quan đến reverse proxy
-- systemd service status/output nếu deploy daemon hoặc helper script chạy qua service
+Dùng:
+- `scripts/collect_logs.sh`
 
-Skill spec nên chỉ rõ thứ tự ưu tiên đọc log để tránh lan man.
+Script này nhận parameter trực tiếp, ví dụ:
+- `scripts/collect_logs.sh --line 100 --candidate app-green --active app-blue --nginx nginx ./log-bundle`
 
-## Analysis Scope
+Nó sẽ lấy log từ các nguồn chính như:
+- candidate container
+- active/previous container nếu cần
+- Nginx container nếu có
 
-Mặc định nên ưu tiên:
-1. candidate container logs
-2. health-check result
-3. traffic-switch evidence
-4. rollback-related logs
-5. supporting host/service logs nếu cần
+Mặc định chỉ lấy phạm vi hẹp, không đọc vô hạn.
 
-Không nên đọc toàn bộ log vô hạn.
-Rule mặc định cho v1 nên là:
-- ưu tiên log trong khoảng thời gian của deploy gần nhất
-- nếu không có timestamp boundary rõ, lấy khoảng `100` dòng cuối từ log nguồn chính trước
+### 2. Analyze
 
-## What to look for
+Dùng:
+- `scripts/analyze_logs.py`
 
-Các nhóm lỗi cần ưu tiên nhận diện:
-- image pull thất bại
-- container start thất bại
+Script này đọc bundle log hoặc text log và cố gắng phân loại lỗi theo các nhóm thực dụng của v1.
+
+### 3. Summarize
+
+Dùng:
+- `scripts/summarize.sh`
+
+Script này tạo output ngắn gọn để trả về cho operator.
+
+## V1 analysis categories
+
+Ít nhất nên nhận diện được:
+- image pull failure
+- container start failure
 - port binding conflict
 - missing env/config/secrets
-- app crash loop
-- health endpoint fail
-- reverse proxy / traffic switch fail
-- rollback fail do previous version không còn hợp lệ
+- application crash
+- health check failure
+- nginx/reverse-proxy failure
+- rollback failure
+- insufficient evidence
 
-Nếu không đủ evidence để chốt một nhóm lỗi cụ thể:
-- nói rõ là `chưa đủ evidence`
-- không bịa root cause
+## Output expectation
 
-## Outputs
+Output nên có:
+- incident type
+- suspected root cause
+- confidence (`high` / `medium` / `low`)
+- evidence snippets
+- operator guidance ngắn
+- slack summary ngắn
 
-`log-analyzer` nên trả về tối thiểu:
-- `incident_type`
-- `suspected_root_cause`
-- `confidence`
-- `evidence_snippets`
-- `affected_container_or_color`
-- `recommended_operator_action`
-- `slack_summary`
+Ví dụ:
+- `Deploy fail trên green: app không bind được port, nghi ngờ conflict với tiến trình hiện có.`
+- `Deploy fail trên green: route / trả 500 sau 3 lần thử, nghi ngờ app crash hoặc thiếu config runtime.`
 
-Trong đó `confidence` nên dùng scale đơn giản:
-- `high`
-- `medium`
-- `low`
+## Parameters
 
-### Expected logical outcomes
-- `deploy_failure_analysis`
-- `rollback_failure_analysis`
-- `insufficient_evidence`
+`log-analyzer` nên ưu tiên parameter thay vì config file riêng.
 
-## Output Format
+Các parameter hữu ích cho v1:
+- `--line <n>`: số dòng log cần lấy, ví dụ `--line 100`
+- `--candidate <container>`: container candidate
+- `--active <container>`: container active/previous
+- `--nginx <container>`: container Nginx/reverse proxy
+- `--bundle <dir>`: thư mục log bundle đã collect
 
-Summary cho Slack nên:
-- ngắn
-- technical nhưng dễ hiểu
-- nêu lỗi chính trước
-- nêu action tiếp theo sau
+Ví dụ:
+- `/log-analyzer --line 100`
+- `/log-analyzer --line 150 --candidate app-green --active app-blue --nginx nginx`
 
-Ví dụ tốt:
-- `Deploy fail trên green: container khởi động nhưng /health trả 500 trong 3 lần thử. Nghi ngờ app thiếu biến môi trường DB_URL.`
-- `Rollback fail: không khôi phục được container blue vì image cũ không còn available trên host.`
+Nếu parameter không được truyền đủ, script có thể fallback sang default hợp lý.
 
-## Operator Guidance
+## Implementation note
 
-Action gợi ý nên thực tế và ngắn gọn, ví dụ:
-- kiểm tra env file
-- kiểm tra image tag/digest
-- xem raw logs của container cụ thể
-- thử rollback thủ công
-- xác minh config Nginx
+Đây là package analyzer thực dụng cho demo.
+Nó không thay thế full observability stack hay log platform.
+Nó chỉ cần đủ tốt để:
+- hỗ trợ operator
+- giải thích lỗi trong demo
+- làm rõ vai trò AI trong phần diagnostics
 
-Không nên đưa khuyến nghị mơ hồ kiểu:
-- “xem lại hệ thống tổng thể”
-- “kiểm tra toàn bộ pipeline”
-
-## Relationship with deploy-orchestrator
-
-`deploy-orchestrator` là skill chính.
-`log-analyzer` chỉ là skill hỗ trợ khi execution path có lỗi hoặc cần chẩn đoán.
-
-Boundary cần giữ rõ:
-- `deploy-orchestrator` quyết định và thực thi flow
-- `log-analyzer` đọc evidence và tóm tắt nguyên nhân
-
-## Why this design fits the project
-
-Thiết kế này hợp với đề tài vì:
-- giữ AI ở phần có giá trị rõ ràng nhất: giải thích lỗi
-- không làm execution flow trở nên quá mơ hồ
-- dễ trình bày trong báo cáo học thuật
-- dễ demo khi có tình huống deploy fail hoặc rollback fail
-- khớp với mô hình demo hiện tại dùng Nginx + Docker Compose và smoke check route public
+Với v1, thiết kế parameter-driven là phù hợp hơn config file riêng vì:
+- gọn hơn
+- dễ gọi từ command/skill input
+- ít file phải quản lý hơn
