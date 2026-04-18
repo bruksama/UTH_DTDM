@@ -1,12 +1,7 @@
 ---
 name: deploy-orchestrator
 description: Orchestrate Slack-triggered deployment for Dockerized web apps on a single VM: auto-init config/state when missing, resolve image tags from a registry, run blue-green deployment with Docker Compose and Nginx, perform health checks, rollback on failure, persist SQLite state, and return concise operator-facing results.
-metadata:
-  openclaw:
-    os: ["linux"]
-    requires:
-      bins: ["bash", "docker", "curl", "python3"]
-      config: ["channels.slack"]
+metadata: {"openclaw":{"os":["linux"],"requires":{"bins":["bash","docker","curl","python3"],"config":["channels.slack"]}}}
 ---
 
 # Deploy Orchestrator
@@ -19,6 +14,9 @@ Nó được thiết kế cho mô hình:
 - Docker / Docker Compose
 - blue-green switch qua Nginx
 - SQLite làm state store
+
+Repo này đang giữ bản authoring của skill ở `openclaw/skills/deploy-orchestrator`.
+Khi cài vào OpenClaw thật, copy nguyên folder này vào một skill root được scan hoặc add parent dir vào `skills.load.extraDirs`.
 
 ## Khi nào dùng skill này
 
@@ -48,7 +46,7 @@ Rollback chỉ chạy tự động khi deploy fail.
 ## Skill package layout
 
 ```text
-deploy-orchestrator/
+{baseDir}/
 ├── SKILL.md
 ├── config/
 │   ├── deploy-config.example.yaml
@@ -59,74 +57,76 @@ deploy-orchestrator/
     ├── common.sh
     ├── deploy.sh
     ├── ensure_init.sh
-    ├── health_check.sh
     ├── init_db.py
     ├── resolve_image.py
-    ├── rollback.sh
     ├── status.sh
-    └── switch_traffic.sh
 ```
+
+Runtime state path được resolve khi chạy từ:
+- `DEPLOY_SQLITE_PATH`
+- `DEPLOY_RUNTIME_DIR`
+- `paths.sqlite_db` hoặc `paths.runtime_dir` trong `{baseDir}/config/deploy-config.yaml`
+
+Không nên assume SQLite state luôn nằm dưới `{baseDir}`.
 
 ## Cách vận hành
 
 ### 1. Auto-init
 
 Khi skill chạy, nếu thiếu config hoặc SQLite DB, hãy chạy:
-- `scripts/ensure_init.sh`
+- `{baseDir}/scripts/ensure_init.sh`
 
 Script này sẽ:
 - tạo thư mục runtime nếu thiếu
-- copy config example nếu chưa có config thật
+- copy `deploy-config.example.yaml` và `deploy.env.example` thành file runtime-local nếu chưa có file thật
+- set permission chặt cho config/env/runtime DB mới tạo
 - tạo SQLite schema nếu DB chưa tồn tại
 
 ### 2. Resolve image
 
-- `deploy latest` -> dùng `scripts/resolve_image.py latest`
-- `deploy <tag>` -> dùng `scripts/resolve_image.py <tag>`
+- `deploy latest` -> dùng `{baseDir}/scripts/resolve_image.py latest`
+- `deploy <tag>` -> dùng `{baseDir}/scripts/resolve_image.py <tag>`
 
-Mặc định v1 ưu tiên registry API.
-Hiện tại mặc định registry là `ghcr.io`, nhưng có thể đổi qua config.
+Resolver hiện tại đọc registry settings từ env runtime như `DEPLOY_REGISTRY_PROVIDER`, `DEPLOY_REGISTRY_BASE`, `DEPLOY_REPOSITORY`, `DEPLOY_PACKAGE_NAME`.
+Mặc định v1 ưu tiên registry API và fallback an toàn khi không đọc được tag list.
 
 ### 3. Deploy flow
 
+Entrypoint chính là `{baseDir}/scripts/deploy.sh`.
+
 Flow chuẩn:
-1. ensure init
-2. resolve image
-3. đọc state hiện tại
-4. chọn candidate color
-5. pull image
-6. start candidate bằng Docker Compose
-7. health check candidate
-8. switch traffic qua Nginx
-9. health check public URL sau switch
-10. cập nhật SQLite state/history
-11. nếu lỗi -> rollback tự động + cập nhật state/history
+1. chạy `{baseDir}/scripts/ensure_init.sh`
+2. resolve image bằng `{baseDir}/scripts/resolve_image.py`
+3. đọc state hiện tại bằng `{baseDir}/scripts/status.sh`
+4. chọn candidate color từ state hiện tại
+5. delegate app-side switch sang `"$DEPLOY_REPO_DIR/scripts/switch.sh"` với candidate color và image tag đã resolve
+6. cập nhật SQLite state/history khi thành công
+7. nếu lỗi -> rollback tự động qua app repo runtime script và cập nhật state/history
 
-### 4. Health policy v1
+### 4. Health và traffic notes
 
-Đã chốt cho v1:
-- route kiểm tra: `/`
-- retry: `3`
-- timeout mỗi lần: `10s`
-- pre-switch: check candidate trong Docker network
-- post-switch: check public URL sau khi Nginx đổi upstream
-
-### 5. Traffic switch v1
-
-Đã chốt cho v1:
-- sửa Nginx upstream active giữa `blue` và `green`
-- reload Nginx nếu có thể; fallback restart nếu cần
+Các field `health.*` và `traffic.*` trong `{baseDir}/config/deploy-config.example.yaml` là handoff note cho deploy runtime/app repo.
+Package skill hiện tại không tự implement health-check loop hay Nginx switch riêng trong `{baseDir}/scripts/`; phần này được delegate sang `"$DEPLOY_REPO_DIR/scripts/switch.sh"`.
 
 ## Config
 
-Skill này dùng 2 loại config:
+Skill này dùng 2 nguồn cấu hình:
 - `.env` cho runtime/env values
-- `yaml` cho deploy behavior/config tĩnh
+- `yaml` cho environment, runtime path, service mapping và install notes
 
-Nếu chưa có file thật, copy từ example rồi sửa.
+File được track trong repo chỉ là example:
+- `{baseDir}/config/deploy-config.example.yaml`
+- `{baseDir}/config/deploy.env.example`
+
+File runtime-local được tạo và chỉnh riêng trên máy chạy:
+- `{baseDir}/config/deploy-config.yaml`
+- `{baseDir}/config/deploy.env`
+
+`.env` chỉ hỗ trợ dòng `KEY=VALUE` đơn giản; shell expression không được execute.
 
 ### Config quan trọng cần có
 - environment name
+- `DEPLOY_REPO_DIR` nếu app repo không nằm ở default `$HOME/.openclaw/workspace/deploy_runtime`
 - default registry
 - image repository
 - compose file path
@@ -136,10 +136,19 @@ Nếu chưa có file thật, copy từ example rồi sửa.
 - active Nginx container/service name
 - candidate service names
 
+Hiện tại các script local consume trực tiếp:
+- env overrides trong `{baseDir}/config/deploy.env`
+- `environment`
+- `paths.runtime_dir`
+- `paths.sqlite_db`
+- `services.{blue,green}`
+
+Các field khác trong YAML example là handoff/install notes cho runtime layer kế tiếp, không phải tất cả đều được local scripts consume trực tiếp.
+
 ## SQLite state
 
 Schema chuẩn tham chiếu ở:
-- `references/sqlite-schema.md`
+- `{baseDir}/references/sqlite-schema.md`
 
 Skill này dùng SQLite để lưu:
 - current state
@@ -161,13 +170,21 @@ Ví dụ:
 
 ## Khi cần đọc thêm
 
-- SQLite schema: `references/sqlite-schema.md`
-- Config examples: `config/`
-- Actual execution logic: `scripts/`
+- SQLite schema: `{baseDir}/references/sqlite-schema.md`
+- Config examples: `{baseDir}/config/`
+- Actual execution logic: `{baseDir}/scripts/`
 
 ## Implementation note
 
 Đây là skill package gần chạy thật cho v1.
+Local contract hiện tại cố ý giữ:
+- `name: deploy-orchestrator`
+- authoring path hiện có trong repo
+
+Deferred tới install phase:
+- move/copy folder sang OpenClaw skill root thật hoặc cấu hình `skills.load.extraDirs`
+- chỉ thêm `metadata.openclaw.skillKey` nếu runtime install phase chứng minh là cần thiết
+
 Nó chưa xử lý đầy đủ các ca production như:
 - private registry auth nâng cao
 - nhiều environment chạy song song

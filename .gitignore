@@ -5,3 +5,5 @@ __pycache__/
 .env
 *.env
 !*.env.example
+openclaw/skills/deploy-orchestrator/config/deploy-config.yaml
+openclaw/skills/deploy-orchestrator/runtime/deploy.db

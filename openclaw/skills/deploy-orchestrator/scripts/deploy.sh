@@ -8,18 +8,14 @@ REQUESTED_IMAGE="${1:-latest}"
 REQUESTED_BY="${2:-unknown}"
 REQUESTED_COMMAND="deploy ${REQUESTED_IMAGE}"
 
-"$SCRIPT_DIR/ensure_init.sh" >/dev/null
+bash "$SCRIPT_DIR/ensure_init.sh" >/dev/null
+require_bin python3
 load_env_if_present
 
-require_bin python3
-
-CONFIG_PATH="${DEPLOY_CONFIG_PATH:-$SKILL_DIR/config/deploy-config.yaml}"
+CONFIG_PATH="$CONFIG_FILE"
 SQLITE_PATH="$DB_PATH"
 ENVIRONMENT="${DEPLOY_ENVIRONMENT:-$(cfg_get environment)}"
-# TRỎ ĐƯỜNG DẪN VỀ REPO CHỨA APP
-REPO_DIR="${DEPLOY_REPO_DIR:-/home/ice147ender/apps/UTH_DTDM_demo}"
-
-export DEPLOY_CONFIG_PATH="$CONFIG_PATH"
+REPO_DIR="$(resolve_deploy_repo_dir)"
 
 DEPLOYMENT_ID="dep-$(date -u +%Y%m%d%H%M%S)-$$"
 STARTED_AT="$(now_utc)"
@@ -31,37 +27,13 @@ RESOLVED_DIGEST=""
 FAIL_STEP="unknown"
 SUCCESS=0
 
-LOCK_EXISTS="$(python3 - "$SQLITE_PATH" "$ENVIRONMENT" <<'PY'
-import sqlite3, sys
-conn = sqlite3.connect(sys.argv[1])
-cur = conn.cursor()
-cur.execute('SELECT COUNT(*) FROM deployment_lock WHERE environment = ?', (sys.argv[2],))
-print(cur.fetchone()[0])
-conn.close()
-PY
-)"
-if [ "$LOCK_EXISTS" != "0" ]; then
+if ! acquire_deployment_lock "$SQLITE_PATH" "$ENVIRONMENT" "$REQUESTED_BY" "$DEPLOYMENT_ID" "$STARTED_AT"; then
   echo "Deploy blocked: another deployment is running for environment $ENVIRONMENT" >&2
   exit 1
 fi
 
-python3 - "$SQLITE_PATH" "$ENVIRONMENT" "$REQUESTED_BY" "$DEPLOYMENT_ID" "$STARTED_AT" <<'PY'
-import sqlite3, sys
-conn = sqlite3.connect(sys.argv[1])
-cur = conn.cursor()
-cur.execute('INSERT OR REPLACE INTO deployment_lock(environment, locked_by, deployment_id, lock_reason, locked_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)',
-            (sys.argv[2], sys.argv[3], sys.argv[4], 'deploy-running', sys.argv[5], None))
-conn.commit(); conn.close()
-PY
-
 cleanup_lock() {
-  python3 - "$SQLITE_PATH" "$ENVIRONMENT" <<'PY'
-import sqlite3, sys
-conn = sqlite3.connect(sys.argv[1])
-cur = conn.cursor()
-cur.execute('DELETE FROM deployment_lock WHERE environment = ?', (sys.argv[2],))
-conn.commit(); conn.close()
-PY
+  release_deployment_lock "$SQLITE_PATH" "$ENVIRONMENT"
 }
 
 handle_failure() {
@@ -82,7 +54,6 @@ PY
 
   if [ -n "$rollback_color" ] && [ -d "$REPO_DIR" ]; then
     echo "Initiating rollback to $rollback_color with tag $rollback_tag..." >&2
-    # GỌI LẠI SCRIPT CỦA APP ĐỂ ROLLBACK
     if (cd "$REPO_DIR" && bash ./scripts/switch.sh "$rollback_color" "$rollback_tag" >/dev/null 2>&1); then
       rollback_status="rolled_back"
       summary="Deploy thất bại ở bước ${FAIL_STEP}, đã rollback về ${rollback_color}."
@@ -131,12 +102,12 @@ trap cleanup_lock EXIT
 trap handle_failure ERR
 
 FAIL_STEP="resolve-image"
-RESOLVED_JSON="$(DEPLOY_CONFIG_PATH="$CONFIG_PATH" python3 "$SCRIPT_DIR/resolve_image.py" "$REQUESTED_IMAGE")"
+RESOLVED_JSON="$(python3 "$SCRIPT_DIR/resolve_image.py" "$REQUESTED_IMAGE")"
 RESOLVED_TAG="$(python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["resolved_tag"])' <<<"$RESOLVED_JSON")"
 RESOLVED_DIGEST="$(python3 -c 'import json,sys; print(json.loads(sys.stdin.read()).get("resolved_digest") or "")' <<<"$RESOLVED_JSON")"
 
 FAIL_STEP="read-state"
-STATE_JSON="$("$SCRIPT_DIR/status.sh")"
+STATE_JSON="$(bash "$SCRIPT_DIR/status.sh")"
 ACTIVE_COLOR="$(python3 -c 'import json,sys; data=json.loads(sys.stdin.read()); print(data.get("active_color") or "")' <<<"$STATE_JSON")"
 PREVIOUS_TAG="$(python3 -c 'import json,sys; data=json.loads(sys.stdin.read()); print(data.get("active_image_tag") or "latest")' <<<"$STATE_JSON")"
 
@@ -158,19 +129,16 @@ PY
 
 FAIL_STEP="delegate-to-app-repo"
 if [ ! -d "$REPO_DIR" ]; then
-  echo "Error: App repository not found at $REPO_DIR" >&2
+  echo "Error: App repository not found at $REPO_DIR. Set DEPLOY_REPO_DIR to override." >&2
   exit 1
 fi
 
-# =====================================================================
-# DELEGATION POINT: Gọi script thực thi hạ tầng của chính ứng dụng
-# =====================================================================
 cd "$REPO_DIR"
 bash ./scripts/switch.sh "$CANDIDATE_COLOR" "$RESOLVED_TAG" >/dev/null
 
 FAIL_STEP="finalize-state"
 FINISHED_AT="$(now_utc)"
-CONTAINER_NAME="app-${CANDIDATE_COLOR}"
+CONTAINER_NAME="$(service_name_for_color "$CANDIDATE_COLOR")"
 SUMMARY="Deploy thành công: ${RESOLVED_TAG} lên ${CANDIDATE_COLOR}, health check pass, traffic đã chuyển."
 
 python3 - "$SQLITE_PATH" "$ENVIRONMENT" "$CANDIDATE_COLOR" "$RESOLVED_TAG" "$RESOLVED_DIGEST" "$CONTAINER_NAME" "$PREVIOUS_COLOR" "$DEPLOYMENT_ID" "$FINISHED_AT" "$SUMMARY" <<'PY'

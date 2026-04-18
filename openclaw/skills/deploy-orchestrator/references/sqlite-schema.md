@@ -1,7 +1,6 @@
 # SQLite schema reference
 
-This skill expects the SQLite schema documented in:
-- `/home/ice147ender/.openclaw/workspace/state/UTH_DTDM/docs/sqlite-state-schema-v1.md`
+This skill expects the SQLite deploy-state schema documented for this project.
 
 For convenience, the runtime bootstrap script creates these tables:
 - `deployment_state`

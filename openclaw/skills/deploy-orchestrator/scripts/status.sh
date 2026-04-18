@@ -4,8 +4,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/common.sh"
 
+require_bin python3
 load_env_if_present
-SQLITE_PATH="${DEPLOY_SQLITE_PATH:-$(cfg_get paths.sqlite_db)}"
+
+SQLITE_PATH="$DB_PATH"
 ENVIRONMENT="${DEPLOY_ENVIRONMENT:-$(cfg_get environment)}"
 
 python3 - "$SQLITE_PATH" "$ENVIRONMENT" <<'PY'
