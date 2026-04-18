@@ -1,17 +1,15 @@
 ---
 name: log-analyzer
 description: Analyze deployment or rollback failures for Dockerized web apps on a single VM: collect relevant logs, extract likely failure categories, summarize evidence, and generate concise operator-facing diagnostics for Slack.
-metadata:
-  openclaw:
-    os: ["linux"]
-    requires:
-      bins: ["bash", "docker", "python3"]
-      config: []
+metadata: {"openclaw":{"os":["linux"],"requires":{"bins":["bash","docker","python3"],"config":[]}}}
 ---
 
 # Log Analyzer
 
 `log-analyzer` là skill phụ cho v1.
+
+Repo này đang giữ bản authoring của skill ở `openclaw/skills/log-analyzer`.
+Khi cài vào OpenClaw thật, copy nguyên folder này vào một skill root được scan hoặc add parent dir vào `skills.load.extraDirs`.
 
 Nó không điều khiển deploy flow chính.
 Vai trò của nó là:
@@ -34,7 +32,7 @@ Không cần gọi skill này cho mọi deploy thành công bình thường.
 ## Skill package layout
 
 ```text
-log-analyzer/
+{baseDir}/
 ├── SKILL.md
 └── scripts/
     ├── analyze_logs.py
@@ -47,10 +45,10 @@ log-analyzer/
 ### 1. Collect logs
 
 Dùng:
-- `scripts/collect_logs.sh`
+- `{baseDir}/scripts/collect_logs.sh`
 
 Script này nhận parameter trực tiếp, ví dụ:
-- `scripts/collect_logs.sh --line 100 --candidate app-green --active app-blue --nginx nginx ./log-bundle`
+- `{baseDir}/scripts/collect_logs.sh --line 100 --candidate app-green --active app-blue --nginx nginx ./log-bundle`
 
 Nó sẽ lấy log từ các nguồn chính như:
 - candidate container
@@ -62,14 +60,14 @@ Mặc định chỉ lấy phạm vi hẹp, không đọc vô hạn.
 ### 2. Analyze
 
 Dùng:
-- `scripts/analyze_logs.py`
+- `{baseDir}/scripts/analyze_logs.py`
 
-Script này đọc bundle log hoặc text log và cố gắng phân loại lỗi theo các nhóm thực dụng của v1.
+Script này nhận một thư mục bundle log và cố gắng phân loại lỗi theo các nhóm thực dụng của v1.
 
 ### 3. Summarize
 
 Dùng:
-- `scripts/summarize.sh`
+- `{baseDir}/scripts/summarize.sh`
 
 Script này tạo output ngắn gọn để trả về cho operator.
 
@@ -77,14 +75,14 @@ Script này tạo output ngắn gọn để trả về cho operator.
 
 Ít nhất nên nhận diện được:
 - image pull failure
-- container start failure
 - port binding conflict
 - missing env/config/secrets
 - application crash
 - health check failure
 - nginx/reverse-proxy failure
-- rollback failure
 - insufficient evidence
+
+Nếu evidence không khớp rule chuyên biệt, analyzer trả về `insufficient_evidence`.
 
 ## Output expectation
 
@@ -120,6 +118,14 @@ Nếu parameter không được truyền đủ, script có thể fallback sang d
 ## Implementation note
 
 Đây là package analyzer thực dụng cho demo.
+Local contract hiện tại cố ý giữ:
+- `name: log-analyzer`
+- authoring path hiện có trong repo
+
+Deferred tới install phase:
+- move/copy folder sang OpenClaw skill root thật hoặc cấu hình `skills.load.extraDirs`
+- chỉ thêm `metadata.openclaw.skillKey` nếu runtime install phase chứng minh là cần thiết
+
 Nó không thay thế full observability stack hay log platform.
 Nó chỉ cần đủ tốt để:
 - hỗ trợ operator
